@@ -1,0 +1,24 @@
+#!/bin/sh
+tempfile=`mktemp`
+dialog --backtitle "$TITLE" \
+	--insecure \
+	--no-cancel --ok-label "Set password" \
+	--passwordform "Set root password:" 13 60 0 \
+	"Enter password:" 	1 1	""  	1 20 18 0 \
+	"Confirm password:"	2 1	""  	2 20 18 0 \
+2>$tempfile
+rc=$?
+
+p1=`sed 2,\\$d < $tempfile`
+p2=`sed -e 1d -e 3,\\$d < $tempfile`
+rm -f "$tempfile"
+need_restart=0
+[ "$p1" = "$p2" ] || need_restart=1
+[ "$p1" = ""    ] && need_restart=1
+[ "$rc" = "0"   ] || need_restatr=1
+if [ "$need_restart" = "1" ]; then
+	root_passwd
+fi
+
+echo "root:$p1" | chroot . chpasswd
+

@@ -1,0 +1,31 @@
+#===========================================================================#
+#                     Makefile сброки образа live                           #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+CONFIGDIR = /usr/share/mkimage
+
+include $(CONFIGDIR)/config.mk
+
+# ovz-el not support xz, but xz default in squashfs
+SQUASHFS_VERSION=4
+PACK_SQUASHFS_OPTS=-comp @SQUASHFS_COMPRESSION@
+
+# содержимое этого каталога кладем прямо внутрь (заменяя то, чт там уже есть,
+# если надо)
+COPY_TREE = chroot
+
+IMAGE_INIT_LIST = +altlinux-release-sisyphus
+
+# список пакетов, которые мы ставим в этот образ
+IMAGE_PACKAGES = ${wildcard packages.d/*.lst}
+
+GLOBAL_USER=@USER@
+GLOBAL_LOCALE=@LOCALE@
+GLOBAL_TIMEZONE=@TIMEZONE@
+
+MKI_PACK_RESULTS = squash:live
+
+include $(CONFIGDIR)/targets.mk
+
+all: build-image copy-tree run-image-scripts pack-image

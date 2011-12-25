@@ -1,0 +1,7 @@
+# а здесь зависимости пакета interactivesystem
+chkconfig  
+e2fsprogs  
+mingetty  
+termutils  
+service  
+

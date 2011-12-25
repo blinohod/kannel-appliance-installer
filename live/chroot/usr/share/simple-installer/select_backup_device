@@ -1,0 +1,59 @@
+#!/bin/sh
+#===========================================================================#
+#        Выбор устройства, на котором лежат образы для разворачивания       #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+set +e
+
+T=`mktemp /tmp/s.XXXXXX`
+T2=`mktemp /tmp/s.XXXXXX`
+for s in `/sbin/blkid -o device | grep -v ^ram | grep -v ^loop | grep -v ^dm- | sort -n`; do
+	[ -h "$s" ] && s=`readlink "$s"`
+	s=${s##*/}
+	size=`cat /sys/class/block/$s/size`
+    if [ "x$size" = "x0" ]; then
+		continue
+    fi
+    echo "$s" >> $T
+done
+
+grep ^sd $T | sort > $T2
+grep ^hd $T | sort >> $T2
+grep -v ^sd $T | grep -v ^hd | sort >> $T2
+
+echo "--backtitle \"$TITLE\"" > $T
+echo '--no-cancel' >> $T
+echo '--visit-items' >> $T
+echo '--menu "Please, select drive with backup data" 0 0 0' >> $T
+cat $T2
+for s in `cat $T2`; do
+    SIZE=$((`cat /sys/class/block/$s/size`*512/1000/1000/1000))
+	MODEL=
+	if [ -f /sys/block/$s/device/model ]; then
+		MODEL=" - `cat /sys/block/$s/device/model`"
+	fi
+    echo "$s \"${SIZE}Gb$MODEL\"" >> $T
+done
+dialog --file $T 2> $T2
+stty sane
+D=`cat $T2`
+rm -f $T $T2
+if [ "x$D" = "x" ]; then
+	echo "Can't find device for install -- exit"
+	return -1
+fi
+mkdir -p /tmp/profiles
+mount /dev/$D /tmp/profiles || (
+	errorbox "Can't mount drive with backup data"
+	select_backup_device
+	exit
+)
+
+if [ ! -f /tmp/profiles/config.ini ]; then
+	errorbox "Can't find config.ini on backup drive"
+	umount /tmp/profiles
+	select_backup_device
+	exit
+fi
+

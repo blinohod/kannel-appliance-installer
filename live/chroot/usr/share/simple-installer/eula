@@ -1,0 +1,34 @@
+#!/bin/sh
+#===========================================================================#
+#                   Выводим лицензионное соглашение                         #
+#===========================================================================#
+# (C) Dmitriy Kruglikov                                            Aug 2011 #
+#===========================================================================#
+TITLE="Netstyle installer. EULA"
+dialog  --clear --title "$TITLE" \
+	--exit-label "Yes, agree" \
+	--help-label "No, sorry" \
+	--help-button \
+        --textbox "/image/EULA.txt" 20 75
+
+retval=$?
+echo $retval
+
+case $retval in
+  1)
+   left=10
+    unit="seconds"
+    while test $left != 0
+    do
+        dialog  --sleep 1 \
+        --title "Oooops..." \
+        --infobox "Installation is interrupted,
+because you do not agree \nwith the license agreement.\n
+After the reboot you can start again.\n
+\n
+Server well be restarted after $left $unit..." 15 60
+    left=`expr $left - 1`
+    test $left = 1 && unit="second"
+    done
+    reboot;;
+esac

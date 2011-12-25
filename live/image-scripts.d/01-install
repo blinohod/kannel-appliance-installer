@@ -1,0 +1,4 @@
+#!/bin/sh -e
+
+sed -i 's/1:2345:respawn:\/sbin\/mingetty --noclear tty1/1:2345:wait:\/bin\/openvt -elfw -c 1 -- \/live\/init/g' /etc/inittab
+

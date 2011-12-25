@@ -1,0 +1,31 @@
+#!/bin/bash -e
+#===========================================================================#
+#                   Выбор профиля (архива) для установки                    #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+T=`mktemp /tmp/s.XXXXXX`
+T2=`mktemp /tmp/s.XXXXXX`
+
+echo "--backtitle \"$TITLE\"" > $T
+echo '--no-cancel' >> $T
+echo '--visit-items' >> $T
+echo '--menu "Please, select profile for install" 0 0 0' >> $T
+for s in `ls -1 /tmp/profiles/*.cpio.xz`; do
+	N=${s##*/}
+	N=${N%%.cpio.xz}
+	echo $N $N >> $T
+	echo $N $N >> $T2
+done
+
+PROFILES=$(cat "$T2" | wc -l)
+
+if [ "$PROFILES" = "1" ]; then
+	msgbox "One profile $N found. No Dialog..."
+	echo $N > /tmp/installer/profile
+else
+	dialog --file $T 2> /tmp/installer/profile
+	stty sane
+fi
+rm -f $T $T2
+

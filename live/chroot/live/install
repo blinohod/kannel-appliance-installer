@@ -1,0 +1,195 @@
+#!/bin/sh
+#===========================================================================#
+#                           Installer                                       #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+# собственно это и есть "main()" инсталлятора
+# откомментировать это не просто, но надеюсь что код самоочевидный
+export TERM="linux"
+export LC_ALL=POSIX
+export HOME=/root
+export PATH=/usr/share/simple-installer:/bin:/sbin:/usr/bin:/usr/sbin
+
+. /live/config
+
+openvt -f -c 3 -l -- env HOME=/root /bin/bash -l
+
+mkdir -p /tmp/installer
+
+# проверка -- не попытка ли это восстановления бэкапа
+if grep -iwqs backuprestore /proc/cmdline; then
+	mount_backup_image
+else
+	ln -s /image /tmp/profiles
+fi
+
+export TITLE="Simple installer. EULA"
+eula
+
+#msgbox "Test for raid"
+#export TITLE="Simple installer. Prepare RAID1"
+#raid
+
+msgbox "Select device"
+export TITLE="Simple installer. Select device"
+select_device
+
+export TITLE="Simple installer. Select prepared image"
+select_profile
+
+export TITLE="Simple installer. Select predefined disk table"
+select_diskprofile
+
+export BOOT_DEVICE=`cat /tmp/installer/device`
+export SWAP_DEVICE=${BOOT_DEVICE}1
+export ROOT_DEVICE=${BOOT_DEVICE}2
+
+export TITLE="Simple installer. Preparing disk table"
+export DISK_PROFILE=`cat /tmp/installer/disk_profile`
+msgbox "Using selected profile..."
+sleep 3
+add_part=`cat /tmp/installer/profiles/$DISK_PROFILE |grep -Ev '(/$|^\;|^\[|swap$)'|cut -d ',' -f3`
+[ ! $add_part = "" ] && msgbox "Added $add_part partition..."
+[ ! $add_part = "" ] && export ADD_DEVICE=${BOOT_DEVICE}3
+
+/live/ini2sfdisk < /tmp/installer/profiles/$DISK_PROFILE > /tmp/sfdisk 2> /tmp/logger
+msgbox "Prepared profile:"
+cat /tmp/sfdisk > /tmp/logger
+
+sfdisk --force -uS "$BOOT_DEVICE" < /tmp/sfdisk &> /tmp/logger
+
+sleep 1
+msgbox "Verifing partitions"
+sfdisk -lV "$BOOT_DEVICE" > /tmp/logger
+
+# иногда почему-то sfdisk обламывался, потому после него еще запускаю partprobe
+msgbox "Re-read partition table..."
+partprobe &> /tmp/logger
+# wait while udev create devices
+sleep 3
+
+msgbox "Create swap..."
+mkswap "$SWAP_DEVICE" &> /tmp/logger
+
+export TITLE="Simple installer. Formating filesistems"
+
+msgbox "Create filesystem / ..."
+ls -l "$ROOT_DEVICE" &> /tmp/logger
+#/sbin/mkfs.ext3 -F -F "$ROOT_DEVICE"  &> /tmp/logger
+/sbin/mkfs.ext4 -F -F -T ext4 "$ROOT_DEVICE"  &> /tmp/logger
+
+if [ ! $add_part = "" ];then
+    msgbox "Create filesystem $add_part ..."
+    /sbin/mkfs.ext4 -F -F -T ext4 "$ADD_DEVICE"  &> /tmp/logger
+fi
+
+msgbox "Mount new rootfs..."
+export TMPDIR="$(/bin/mktemp -d)"
+/bin/mount "$ROOT_DEVICE" "$TMPDIR" &> /tmp/logger
+cd "$TMPDIR"
+
+if [ ! $add_part = "" ];then
+    msgbox "Mount other filesystems ..."
+    mkdir -p "$TMPDIR$add_part"
+    /bin/mount "$ADD_DEVICE" "$TMPDIR$add_part" &> /tmp/logger
+fi
+
+export TITLE="Simple installer. Main installation"
+
+msgbox "Please wait until unpacking image..."
+image=/tmp/profiles/`cat /tmp/installer/profile`.cpio.xz
+if [ ! -f "$image" ]; then
+	cerrorbox "Not found: $image"
+fi
+
+
+#Тут бы оттопырить выхлоп xz -d -v и организовать прогресс-индикатор...
+msgbox "Unpacking $image ..."
+unpack=$(xz -l ${image} | grep ${image} | awk -F ' ' '{print $5 " " $6}')
+totals=$(xz -l --robot ${image} | grep totals | awk -F ' ' '{print $5}')
+
+imagename=`cat /tmp/installer/profile`
+
+(xz -d < $image | pv -n -s $totals  |cpio -i &> /tmp/logger) 2>&1 | dialog \
+    --backtitle "NetStyle installer" \
+    --title "Unpacking ${imagename}" "$@" \
+    --gauge "We need to unpack ${unpack}." 10 70
+
+msgbox "Generating fstab..."
+/live/ini2fstab "$BOOT_DEVICE" < /tmp/installer/profiles/$DISK_PROFILE > etc/fstab
+#eval `blkid -o export $ROOT_REVICE`
+#echo "# was $ROOT_DEVICE in installer"
+#echo "UUID="$UUID" / ext3 defaults 0 0" >> ./etc/fstab
+
+msgbox "Mount system filesystems..."
+mount -t proc proc proc &> /tmp/logger
+mount -t sysfs sysfs sys &> /tmp/logger
+mount --bind /dev dev &> /tmp/logger
+
+# create initrd
+msgbox "Creating initrds..."
+create-initrds
+
+export TITLE="Simple installer. Install bootloader"
+echo "TelcoLinux 6.0 (NextStep)" > $TMPDIR/etc/altlinux-release
+msgbox "Distribution: `cat $TMPDIR/etc/altlinux-release`"
+
+# install bootloader
+if [ -f usr/sbin/grub-install ]; then
+	msgbox "Found GRUB. Installing..."
+	chroot . grub-install "$BOOT_DEVICE" &> /tmp/logger
+	msgbox "Generating grub configuration..."
+	chroot . grub-mkconfig -o /boot/grub/grub.cfg &> /tmp/logger
+elif [ -f sbin/lilo ]; then
+	msgbox "Found LILO. Installing..."
+	install_lilo
+fi
+
+# если мы разворачивали бэкап, то у нас могут быть привязки имен интерфейсов к MAC-адресам
+# так как развертывание может быть на другом железе -- надо эти привязки удалить
+if [ -f etc/udev/rules.d/70-persistent-net.rules ]; then
+	echo -n > etc/udev/rules.d/70-persistent-net.rules
+fi
+
+ls -l "$ROOT_DEVICE" &> /tmp/logger
+
+###
+# проверка -- не попытка ли это восстановления из образа бэкапа
+if grep -iqs ^backup /tmp/installer/profile; then
+    echo "Restoring from backup. Not configured."> /tmp/logger
+else
+    msgbox "Simple installer. Select TimeZone"
+    export TITLE="Simple installer. Select timezone"
+    select_timezone
+
+    msgbox "Set root password..."
+    export TITLE="Simple installer. Set root password"
+    root_passwd
+
+    export TITLE="Simple installer. Configure admin user."
+    msgbox "Admin user..."
+    admin_user
+
+    export TITLE="Simple installer. Setup networking"
+    msgbox "Select NIC..."
+    select_nic
+fi
+
+export TITLE="Simple installer. Done."
+dialog  --title "Congratulations" --clear "$@" \
+        --msgbox "System installation is complete.\nRemove the installation CD \
+        from the drive and reload the box." 10 41
+
+msgbox "Done..."
+
+umount proc
+umount sysfs
+umount dev
+
+cp -f /tmp/install.log ./root/install.log &> /tmp/logger
+cp /tmp/install.log /tmp/profiles/log-`date +"%Y-%m-%d--%H-%M"`.txt &> /dev/null
+
+cd /
+umount "$TMPDIR"
+reboot

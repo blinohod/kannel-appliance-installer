@@ -1,0 +1,40 @@
+#!/usr/bin/perl -w
+#===========================================================================#
+#                     Создание fs по config.ini                             #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+# !!! WARNING !!! это пока заглушка которая ничего полезного не делает
+use strict;
+
+# читаем конфиг, вырезая из него все кроме секции [fdisk]
+my @fdisk;
+{
+    my $section = 'default';
+    while (<>) {
+        s/#.*//;
+		s/;.*//;
+        s/\s+$//;
+        next if $_ eq '';
+        if ( $_ =~ /^\[(.+)\]$/ ) {
+            $section = $1;
+        }
+        elsif ( $section eq 'fdisk' ) {
+            push @fdisk, $_;
+        }
+    }
+}
+
+foreach (@fdisk) {
+    my @d = split( /,/, $_ );
+    my $size = $d[0];
+    $size = $1 * 1024 * 1024 * 1024 * 2 if $size =~ /^(\d+)T/;
+    $size = $1 * 1024 * 1024 * 2        if $size =~ /^(\d+)G/;
+    $size = $1 * 1024 * 2               if $size =~ /^(\d+)M/;
+    my $type = $d[1];
+    $type = 'L' if $type =~ /^ext\d/;
+    $type = 'S' if $type eq 'swap';
+    print "$first_sector,$size,$type\n";
+    exit if $size eq '';
+    $first_sector += $size;
+}

@@ -1,0 +1,66 @@
+#!/bin/bash -e
+#===========================================================================#
+#                   Выбор профиля (шаблона) для разбивки диска              #
+#===========================================================================#
+# (C) Dmitriy Kruglikov                                            Aug 2011 #
+#===========================================================================#
+D=`mktemp /tmp/d.XXXXXX`
+
+stoled_mem=$(cat /proc/meminfo | grep MemTotal | tr -s ' ' |cut -d' ' -f2)
+#hdd_size=$(sfdisk -s `cat /tmp/installer/device`)
+
+auto_profile="/tmp/installer/profiles/Auto_swap-rest_root.profile"
+mkdir -p /tmp/installer/profiles
+
+calculate(){
+    if [ $stoled_mem -gt 8388608 ];then
+	swp=$stoled_mem
+    else
+	swp=$(($stoled_mem*2/1000))
+    fi
+     
+#    swp=$((`cat /sys/block/$s/size`*512/1000/1000/1000))
+#    swp=`expr $stoled_mem \* 2`
+#    rest=`expr $hdd_size - $swp`
+#    [ $stoled_mem -gt 8388608 ] && swp=$stoled_mem
+
+    echo ";===========================================================================;" > $auto_profile
+    echo ";             Generated automaticaly                                        ;" >> $auto_profile
+    echo ";===========================================================================;" >> $auto_profile
+    echo "; Found stoled RAM: $stoled_mem" >> $auto_profile
+    echo "; Found HDD: $hdd_size" >> $auto_profile
+    echo ";" >> $auto_profile
+    echo "[fdisk]" >> $auto_profile
+    echo "$swp MB,swap" | tr -d ' ' >> $auto_profile
+    echo ",ext4,/" >> $auto_profile
+    echo "" >> $auto_profile
+}
+
+calculate
+
+cp /image/*.profile /tmp/installer/profiles/
+
+echo "--backtitle \"$TITLE\"" > $D
+echo '--no-cancel' >> $D
+echo '--visit-items' >> $D
+echo '--menu "Please, select profile for disk partitioning" 17 70 7' >> $D
+#echo "\"Manual\"" "\"By external programm\"" >> $D
+for d in `ls -1 /tmp/installer/profiles/*.profile`; do
+        P=${d##*/}
+        DESKR=$(echo `basename $d .profile`|tr '_' ' '|tr '-' ';')
+        echo "\"$P\"" "\"$DESKR\"">> $D
+done
+
+#echo "\"Manual\"" "\"By external programm\"" >> $D
+
+DPROFILES=$(cat "$D" | wc -l)
+
+if [ "$DPROFILES" = "1" ]; then
+	msgbox "One profile $M found. No Dialog..."
+	echo $M > /tmp/installer/disk_profile
+else
+	dialog --file $D 2> /tmp/installer/disk_profile
+	stty sane
+fi
+rm -f $D
+

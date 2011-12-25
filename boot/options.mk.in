@@ -1,0 +1,5 @@
+MKI_PACK_RESULTS = boot:netstyle-installer-@RELEASE@-@KERNEL@.iso
+BOOT_TYPE=isolinux
+PROPAGATOR_VERSION = NetStyle installer (build date : $(shell date +%Y.%m.%d))
+PROPAGATOR_MAR_MODULES = boot/modules
+PROPAGATOR_INITFS = boot/initfs

@@ -1,0 +1,41 @@
+#!/bin/zsh
+zmodload zsh/curses
+
+trap 'zcurses end' EXIT
+
+msgbox() {
+	text=$1
+	echo ${#text}
+
+	zcurses position stdscr scrsize
+
+	xsize=$(( ${#text} + 6 ))
+	xdiff=$(( ($COLUMNS-$xsize) / 2 ))
+	ysize=3
+	ROWS=$scrsize[5]
+	ydiff=$(( ($ROWS-$ysize) / 3 ))
+	zcurses addwin msgbox $ysize $xsize $ydiff $xdiff stdscr
+	zcurses border msgbox
+	zcurses bg msgbox bold yellow/blue  '@ '
+
+	zcurses addwin msgbox_text $(( $ysize - 2 )) $(( $xsize - 2 )) $(( $ydiff + 1 )) $(( $xdiff + 1 ))
+	zcurses bg msgbox_text bold white/blue
+	zcurses string msgbox_text "$text"
+	zcurses refresh msgbox
+	zcurses refresh msgbox_text
+}
+
+zcurses init
+
+zcurses bg stdscr white/blue
+zcurses border stdscr
+zcurses refresh stdscr
+
+msgbox "Partitioning..."
+
+
+sleep 1
+
+zcurses end
+
+

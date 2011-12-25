@@ -1,0 +1,36 @@
+#===========================================================================#
+#              Основной Makefile -- сборка iso-образа                       #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+CONFIGDIR = /usr/share/mkimage
+
+include $(CONFIGDIR)/config.mk
+
+GLOBAL_HSH_APT_CONFIG=@APTCONF@
+
+# подкаталоги с описанием сборки того, что будет положено на CD -- мы
+# собираем только live
+SUBDIRS = live
+
+CHROOT_PACKAGES = kernel-image-@KERNEL@ syslinux \
+                 file \
+                 syslinux \
+                 findutils \
+                 make-initrd \
+                 make-initrd-propagator \
+                 propagator
+
+MKI_SCRIPTDIR = boot/scripts.d
+
+# что положить в iso, кроме того что мы собрали?
+# может быть указано несколько каталогов
+COPY_TREE = iso ${HOME}/out/profiles/netstyle
+
+# опции для сборки пропагатора
+include boot/options.mk
+include $(CONFIGDIR)/targets.mk
+
+all: copy-tree copy-subdirs run-scripts pack-image
+
+pack-image: OUTDIR = @OUTDIR@

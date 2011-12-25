@@ -1,0 +1,8 @@
+#!/bin/sh -e
+
+if [ -n "$GLOBAL_USER" ]; then
+    useradd $GLOBAL_USER
+    usermod -G wheel $GLOBAL_USER
+    usermod -p "" $GLOBAL_USER
+    chown -R $GLOBAL_USER:auth /etc/tcb/$GLOBAL_USER
+fi

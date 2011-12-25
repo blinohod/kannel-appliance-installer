@@ -1,0 +1,37 @@
+#!/bin/sh
+
+need_restart=0
+user="superadmin"
+p1=
+p2=
+exec 3>&1
+
+value=`dialog --backtitle "$TITLE" \
+	--title "" --clear \
+	--insecure "$@"\
+	--no-cancel --ok-label "Create user" \
+	--mixedform "Create a user who will have administrative rights on this server:" 15 70 0 \
+	"User name:"        1 1 "$user" 1 20 18 0 2 \
+	"Enter password:"   2 1 ""      2 20 18 0 1 \
+	"Confirm password:" 3 1 ""      3 20 18 0 1 \
+2>&1 1>&3`
+
+rc=$?
+readoutput()
+{
+    user="$1"; p1="$2"; p2="$3"
+}
+readoutput `echo "$value" | tr "\n" " "`
+
+[ "$p1" = "$p2" ] || need_restart=1
+[ "$p1" = ""    ] && need_restart=1
+[ "$rc" = "0"   ] || need_restatr=1
+if [ "$need_restart" = "1" ]; then
+    admin_user
+fi
+
+chroot . useradd "$user"
+echo "$user:$p1" | chroot . chpasswd
+
+
+

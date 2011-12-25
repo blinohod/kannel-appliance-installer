@@ -1,0 +1,55 @@
+#!/usr/bin/perl -w
+#===========================================================================#
+#                 Генерирование fstab из config.ini                         #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+use strict;
+
+my $device_base = shift;
+
+# читаем конфиг, вырезая из него все кроме секции [fdisk]
+my @fdisk;
+{
+    my $section = 'default';
+    while (<>) {
+        s/#.*//;
+		s/;.*//;
+        s/\s+$//;
+        next if $_ eq '';
+        if ( $_ =~ /^\[(.+)\]$/ ) {
+            $section = $1;
+        }
+        elsif ( $section eq 'fdisk' ) {
+            push @fdisk, $_;
+        }
+    }
+}
+
+# 4Mb align
+my $first_sector = 8192;
+my $was_boot     = 0;
+
+my $i = 0;
+
+print "
+proc\t\t/proc           proc    nosuid,noexec,gid=proc      0 0
+devpts\t\t/dev/pts        devpts  nosuid,noexec,gid=tty,mode=620  0 0
+tmpfs\t\t/tmp            tmpfs   nosuid              0 0
+/dev/sr0\t/media/cdrom    udf,iso9660 ro,noauto,user,utf8 0 0
+
+";
+
+foreach (@fdisk) {
+	$i++;
+    my @d = split( /,/, $_ );
+	my $type = $d[1];
+	my $mountpoint = defined($d[2]) ? $d[2] : '';
+	$mountpoint = 'swap' if $type eq 'swap';
+	my $fsck = 2;
+	$fsck = 1 if $mountpoint eq '/';
+	$fsck = 0 if $mountpoint eq 'swap';
+	next if $mountpoint eq '';
+	print "$device_base$i\t$mountpoint\t\t$type\tdefaults\t0\t$fsck\n";
+
+}

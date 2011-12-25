@@ -1,0 +1,45 @@
+#!/bin/sh
+#===========================================================================#
+#                          Установка lilo                                   #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+# !!! WARNING !!!
+#
+# Это очень наивный модуль. Он работает, но проку от него не то чтобы много я
+# настоятельно не рекомендую его использовать в новых инсталляциях, и он был
+# написан только для восстановления из cpio-backup образов, в которых
+# используется lilo а не grub
+#
+# Я также рекомендую на тех машинах где еще lilo установить таки grub, или
+# переписать этот модуль целиком.
+
+if [ ! -f ./etc/lilo.conf ]; then
+	msgbox "/etc/lilo.conf not found -- create new"
+/bin/cat >> ./etc/lilo.conf << EOF
+map="/boot/map"
+lba32
+compact
+prompt
+boot="$BOOT_DEVICE"
+vga=normal
+timeout=30
+append="panic=30"
+default="linux"
+
+image="/boot/vmlinuz"
+    label="linux"
+    initrd="/boot/initrd.img"
+    root="$ROOT_DEVICE"
+    read-only
+EOF
+fi
+
+sed -i "s%^boot=.*%boot=\"$BOOT_DEVICE\"%g" etc/lilo.conf
+sed -i 's%^\([[:space:]]*\)root=.*%\1root="'$ROOT_DEVICE'"%g' etc/lilo.conf
+
+msgbox "Install lilo..."
+
+chroot . /sbin/lilo -M "$BOOT_DEVICE" &> /tmp/logger
+chroot . /sbin/lilo &> /tmp/logger
+

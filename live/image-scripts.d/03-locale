@@ -1,0 +1,6 @@
+#!/bin/sh -e
+
+cat >> /etc/sysconfig/i18n <<END
+LANG=$GLOBAL_LOCALE.UTF-8
+SUPPORTED=$GLOBAL_LOCALE
+END

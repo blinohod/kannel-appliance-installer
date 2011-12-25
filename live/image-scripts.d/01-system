@@ -1,0 +1,22 @@
+#!/bin/sh -e
+
+/bin/echo "127.0.0.1 localhost.localdomain localhost" > /etc/hosts
+/bin/echo > /etc/resolv.conf
+
+ln -sf /proc/mounts /etc/mtab
+
+#chkconfig consolesaver off
+#chkconfig livecd-save-state off
+chkconfig netfs off
+chkconfig rawdevices off
+
+usermod -p "" root
+
+REMOUNT_RW="/sbin/fake_remount_rw"
+
+if [ -f "$REMOUNT_RW" ]; then
+    chmod +x "$REMOUNT_RW"
+    echo "REMOUNT_ROOTFS_RW_COMMAND=$REMOUNT_RW" >> /etc/sysconfig/init
+fi
+
+mkdir -p /image

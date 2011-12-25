@@ -1,0 +1,4 @@
+#!/bin/sh
+# этот хак кажется уже не нужен, или еще нужен?
+rm -f /etc/mtab && ln -s /proc/mounts /etc/mtab
+

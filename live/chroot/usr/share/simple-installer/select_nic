@@ -1,0 +1,34 @@
+#!/bin/bash -e
+#===========================================================================#
+#         Выбор сетевых адаптеров для настройки (на следующем шаге)         #
+#===========================================================================#
+# (C) Dmitriy Kruglikov                                            Aug 2011 #
+#===========================================================================#
+T=`mktemp /tmp/n.XXXXXX`
+
+mkdir -p /tmp/installer
+
+echo "--backtitle \"$TITLE\" \\" > $T
+echo ' --title "Ethernet adapters" --clear \' >> $T
+echo ' --checklist "Select the ones that need to be configured." 15 60 4 \' >> $T
+
+ifconfig -a | grep eth | while read name p1 p2 p3 mac; do
+#	eth_form "$name" "$mac"
+	status="Off"
+	[ "$name" = "eth0" ] && status="On"
+	echo "    \"$name\" \"$mac\" "$status" \\">> $T
+    done 2>/dev/null
+
+dialog "$@" --file $T 2> /tmp/installer/selected_nic
+stty sane
+
+echo "Selected NICs" > /tmp/logger
+cat /tmp/installer/selected_nic> /tmp/logger
+
+rm -f $T
+
+for nic in `cat /tmp/installer/selected_nic`;do 
+	subnet=`echo $nic|cut -c5`
+	msgbox "Configuring $nic"
+	eth_form "$subnet"
+done

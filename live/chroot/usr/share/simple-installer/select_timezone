@@ -1,0 +1,29 @@
+#!/bin/bash -e
+#===========================================================================#
+#         Выбор сетевых адаптеров для настройки (на следующем шаге)         #
+#===========================================================================#
+# (C) Dmitriy Kruglikov                                            Aug 2011 #
+#===========================================================================#
+T=`mktemp /tmp/time.XXXXXX`
+TITLE="Simple installer. Timezone."
+
+echo "--backtitle \"$TITLE\" \\" > $T
+echo ' --title "Time settings" \' >> $T
+echo ' --radiolist "Select timezone." 19 60 10 \' >> $T
+
+grep -v ^# /usr/share/zoneinfo/zone.tab | sort -n -k 3b,3| while read name coords descr garbage; do
+    echo "    \"$descr\" \"$name\" off  \\" >> $T
+    done 2>/dev/null
+echo '' >> $T
+
+dialog "$@" --file "$T" 2> /tmp/timezone
+stty sane
+rm -f $T
+
+export GLOBAL_TIMEZONE=`cat /tmp/timezone`
+
+subst "s|HWCLOCK_SET_AT_HALT=false|HWCLOCK_SET_AT_HALT=true|g" $TMPDIR/etc/sysconfig/clock
+subst "s|HWCLOCK_ADJUST=false|HWCLOCK_ADJUST=true|g" $TMPDIR/etc/sysconfig/clock
+subst "s|#ZONE=\"Europe\/Moscow\"|ZONE=\"$GLOBAL_TIMEZONE\"|g" $TMPDIR/etc/sysconfig/clock
+
+cat /usr/share/zoneinfo/$GLOBAL_TIMEZONE > $TMPDIR/etc/localtime

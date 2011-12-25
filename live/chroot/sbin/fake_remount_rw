@@ -1,0 +1,32 @@
+#!/bin/sh
+#===========================================================================#
+#                          Псевдо remount_rw                                #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+# этот скрипт можно использовать вместо remount_rw, для того чтобы
+# можно было сделать инсталлер без aufs
+# разумеется цена этого -- небольшое увеличение потребляемой памяти по
+# сравнению с использованием remount_rw (в tmpfs некоторые каталоги кладутся
+# целиком, в не только измененные файлы)
+
+remount_tmpfs()
+{
+    fs_path=$1
+	tmpdir=/var/tmp/remount
+    mkdir -p "$tmpdir"
+    mount -t tmpfs tmpfs "$tmpdir"
+	rsync -a $1/ $tmpdir/ > /dev/null
+    mount -t tmpfs tmpfs $fs_path
+	rsync -a $tmpdir/ $1/ > /dev/null
+	umount $tmpdir/
+	rmdir $tmpdir
+}
+
+mount -t tmpfs tmpfs /var/tmp
+remount_tmpfs /var/run
+remount_tmpfs /var/lock
+remount_tmpfs /etc
+remount_tmpfs /var/log
+umount /var/tmp
+

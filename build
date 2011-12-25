@@ -1,0 +1,56 @@
+#!/bin/bash
+#===========================================================================#
+#                     Скрипт сборки инсталлятора                            #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+OUTDIR=~/out/iso
+
+# имя профиля (просто имя текущего каталога)
+# здесь используется только для имени лога
+pname=$(basename $(realpath .))
+
+# имя временного каталога (у меня /mnt/auto/tmp -- это tmpfs монтирующийся
+# через autofs, для того чтобы если я что-то собрал а потом занимаюсь чем-то
+# еще -- он бы спокойно отмонтировался а не ел впустую память
+tmpdir=~/tmp/$pname
+
+# куда кладем логи
+logdir=`realpath ..`
+logfile=$logdir/$pname.`date +%s`.log
+
+# на всякий случай :)
+export NPROC; NPROC=1
+
+mkdir -p $OUTDIR
+OUTDIR=`realpath $OUTDIR`
+
+# копирую во временный каталог этот профиль
+make -C "$tmpdir" distclean 2>&1 > /dev/null ||:
+rsync -avP --exclude .git --delete-after  ./ "$tmpdir/"
+
+pushd $tmpdir
+mkdir -p $OUTDIR
+
+# а тут просто выполняю сборку :)
+autoconf
+#  --with-aptconf=/home/mithraen/.hasher/apt.conf.i586 \
+
+./configure \
+  --with-release=6.0 \
+  --with-kernel=std-def \
+  --with-outdir=$OUTDIR \
+	2>&1  | tee -a $logfile
+make 2>&1 | tee -a $logfile
+
+make distclean 2>&1 | tee -a $logfile
+
+exit
+
+#./configure \
+#  --with-release=5.9 \
+#  --with-kernel=ovz-el \
+#  --with-outdir=$OUTDIR \
+#	2>&1  | tee -a $logfile
+#make 2>&1 | tee -a $logfile
+

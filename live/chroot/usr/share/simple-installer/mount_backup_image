@@ -1,0 +1,19 @@
+#!/bin/sh
+#===========================================================================#
+#               Монтирование образа с backup'ом                             #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+# если в системе есть диск с LABEL=backup, то монтируем его
+# иначе -- выдаем менюшку
+msgbox 'Detect drive with backup data'
+
+drive=`blkid -L backup 2> /tmp/logger`
+
+if [ "$drive" = "" ]; then
+	select_backup_device
+else
+	msgbox 'Mount drive with backup data'
+	mkdir -p /tmp/profiles     &> /tmp/logger
+	mount $drive /tmp/profiles &> /tmp/logger
+fi

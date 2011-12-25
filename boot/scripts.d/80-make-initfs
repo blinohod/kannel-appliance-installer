@@ -1,0 +1,9 @@
+#!/bin/sh
+
+kver="$(ls -1 /boot/vmlinuz* |sed -e 's,/boot/vmlinuz-,,')"
+#kver="3.0.4-std-def-alt0.M60P.2"
+subst 's/AUTODETECT/#AUTODETECT/' /etc/initrd.mk
+echo 'FEATURES += propagator' > /etc/initrd.mk
+make-initrd --no-checks -k $kver
+mv /boot/initrd-$kver.img /usr/lib64/propagator/initfs
+

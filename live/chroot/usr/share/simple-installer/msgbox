@@ -1,0 +1,8 @@
+#!/bin/sh
+echo > /tmp/logger
+echo "#========================================" > /tmp/logger
+echo "# $@"                                      > /tmp/logger
+echo "#========================================" > /tmp/logger
+dialog --backtitle "$TITLE" \
+	--infobox "$@" 3 60
+

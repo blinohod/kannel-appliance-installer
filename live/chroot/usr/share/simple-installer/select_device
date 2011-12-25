@@ -1,0 +1,83 @@
+#!/bin/sh
+#===========================================================================#
+#             Выбор устройства, на которое мы будем устанавливаться         #
+#===========================================================================#
+# (C) Denis Smirnov                                                May 2011 #
+#===========================================================================#
+set +e
+
+T=`mktemp /tmp/s1.XXXXXX`
+T2=`mktemp /tmp/s2.XXXXXX`
+
+for s in `ls -1 /sys/block | grep -vE '^ram|^loop'`; do
+	removable=`cat /sys/block/$s/removable`
+	size=`cat /sys/block/$s/size`
+
+    if [ "x$removable" != "x0" ]; then
+		continue
+    fi
+    if [ "x$size" = "x0" ]; then
+		continue
+    fi
+    # non-removable devices with non zero size
+    echo "$s" >> $T
+done
+
+grep ^sd $T | sort > $T2
+grep ^hd $T | sort >> $T2
+grep -v ^sd $T | grep -v ^hd | sort >> $T2
+
+echo "--backtitle \"$TITLE\"" > $T
+echo '--no-cancel' >> $T
+echo '--visit-items' >> $T
+echo '--menu "Please, select drive for install" 0 0 0' >> $T
+cat $T2
+for s in `cat $T2`; do
+    SIZE=$((`cat /sys/block/$s/size`*512/1000/1000/1000))
+	MODEL=
+	if [ -f /sys/block/$s/device/model ]; then
+		MODEL=" - `cat /sys/block/$s/device/model`"
+	fi
+    echo "$s \"${SIZE}Gb$MODEL\"" >> $T
+done
+
+dialog --file $T 2> $T2
+stty sane
+
+
+D=`cat $T2`
+parts=`sfdisk -l /dev/$D 2> /dev/null | grep ^/dev | wc -l`
+
+if [ $parts -gt 0 ];then
+msgbox "Found $parts partitions on /dev/$D"
+dialog --title "Warning! Warning! Warning!" --clear --colors \
+        --yes-label "Yes. I'm know!" \
+        --no-label "Select another" \
+        --yesno "Device /dev/$D have some data.\n\n
+If you press \"Yes. I'm know!\", all data on device \n\Z1will be lost!\Zn \n\n
+Press \"Select another\" for repeat last step." 15 70
+
+ case $? in
+  0)
+    D=`cat $T2`
+    if [ "x$D" = "x" ]; then
+	echo "Can't find device for install -- exit"
+	return -1
+    fi
+    echo "Selected /dev/$D" > /tmp/logger
+    echo -n /dev/$D > /tmp/installer/device
+    rm -f $T $T2 $T3
+    ;;
+  1)
+    select_device;;
+ esac
+else
+    rm -f $T $T2
+    if [ "x$D" = "x" ]; then
+	echo "Can't find device for install -- exit"
+	return -1
+    fi
+    echo -n /dev/$D > /tmp/installer/device
+fi
+
+

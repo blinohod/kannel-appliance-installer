@@ -1,0 +1,8 @@
+.work
+config.log
+config.status
+configure
+autom4te.cache
+Makefile
+*.cpio.xz
+

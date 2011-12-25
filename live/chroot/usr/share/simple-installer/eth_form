@@ -1,0 +1,68 @@
+#!/bin/sh
+
+need_restart=0
+NIC="eth$1"
+MAC="$2"
+sub="$1"
+value=""
+backtitle="Simple installer. Setup networking."
+title="Ethernet adapter: $NIC"
+ip_regex="\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
+
+exec 3>&1
+
+value=`dialog --backtitle "$backtitle" \
+	--title "$title" --clear \
+	--ok-label "Configure" \
+	--cancel-label "Later" \
+	--mixedform "Marked (*) fields is mandatory" 15 55 5 \
+	"IP address:*" 1 1 "192.168.$sub.100" 1 13 15 0 0  "/" 1 28 "24" 1 29 2 0 0 \
+	"Gateway:   *" 2 1 "192.168.$sub.1"   2 13 15 0 0 \
+	"Server DNS: " 3 1 "192.168.$sub.2"   3 13 15 0 0 \
+	"Host.Domain:" 4 1 "somehost"         4 13 15 0 0 "."  4 28 "domain.local" 4 29 20 0 0 \
+2>&1 1>&3`
+
+rc=$?
+
+stty sane
+
+read_output()
+{
+    ip="$1"; mask="$2"; gate="$3"; dns="$4"; host="$5"; domain="$6"
+}
+
+config_nic() {
+     mkdir -p $TMPDIR/etc/net/ifaces/$NIC
+     echo "$ip/$mask" > $TMPDIR/etc/net/ifaces/$NIC/ipv4address
+     echo "default via $gate" > $TMPDIR/etc/net/ifaces/$NIC/ipv4route
+     echo "TYPE=eth" > $TMPDIR/etc/net/ifaces/$NIC/options
+     echo "ONBOOT=yes" >> $TMPDIR/etc/net/ifaces/$NIC/options
+     [ -n "$dns" ] && echo "nameserver $dns" > $TMPDIR/etc/net/ifaces/$NIC/resolv.conf
+     [ -n "$host" ] && subst "s|HOSTNAME=.*|HOSTNAME=$host.$domain|g" $TMPDIR/etc/sysconfig/network
+     [ -n "$domain" ] && subst "s|DOMAINNAME=.*|DOMAINNAME=$domain|g" $TMPDIR/etc/sysconfig/network
+     [ -n "$host" -a -n "$domain" ] && echo -e "127.0.0.1\t$host.$domain \t$host" >> $TMPDIR/etc/hosts
+}
+
+case $rc in
+    0)
+    read_output `echo "$value" | tr "\n" " "`
+    [ "$ip" = "" ] && need_restart=1
+    [ "$mask" = "" ] && need_restart=1
+    [ "$gate" = "" ] && need_restart=1
+    echo "$ip" | egrep -qs $ip_regex
+    [ $? -eq 0 ] || need_restart=1
+
+    if [ "$need_restart" = "1" ]; then
+	eth_form $sub
+    else
+        msgbox "Configuring $NIC whith $value"
+	config_nic 2> /tmp/logger
+    fi
+    ;;
+    1)
+    msgbox "NIC $NIC must be configured later..."
+    mkdir -p $TMPDIR/etc/net/ifaces/$NIC
+    echo "TYPE=eth" > $TMPDIR/etc/net/ifaces/$NIC/options
+    echo "ONBOOT=NO" >> $TMPDIR/etc/net/ifaces/$NIC/options
+    ;;
+esac

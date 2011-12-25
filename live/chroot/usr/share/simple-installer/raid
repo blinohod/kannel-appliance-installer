@@ -1,0 +1,83 @@
+#!/bin/sh
+#===========================================================================#
+#             Определение целесообразности создания RAID                    #
+#===========================================================================#
+# (C) Dmitriy Kruglikov                                            Aug 2011 #
+#===========================================================================#
+set +e
+
+T=`mktemp /tmp/rd1.XXXXXX`
+T2=`mktemp /tmp/rd2.XXXXXX`
+T3=`mktemp /tmp/rd3.XXXXXX`
+
+propose_raid() {
+dialog --backtitle "$TITLE" \
+	--title "RAID"  --clear --colors \
+        --yes-label "Yes. Create!" \
+        --no-label "No. Select device" \
+        --yesno "We found more than one HDD.\n`cat $T3` \n\
+Now we can create a RAID if you press \"Yes. Create!\". \n
+RAID will be created and selected on next step. \n\n
+Press \"No. Select device\" for omitting RAID creation." 15 60
+
+ret=$?
+    case $ret in
+	0)
+	msgbox "$ret. User wants to create RAID"
+	;;
+	1)
+	msgbox "$ret. User wan't to create RAID"
+	;;
+	255)
+	msgbox "$ret. User press ESC."
+	;;
+    esac
+}
+
+for s in `ls -1 /sys/block | grep -vE '^ram|^loop|^md'`; do
+	removable=`cat /sys/block/$s/removable`
+	size=`cat /sys/block/$s/size`
+
+    if [ "x$removable" != "x0" ]; then
+		continue
+    fi
+    if [ "x$size" = "x0" ]; then
+		continue
+    fi
+    # non-removable devices with non zero size
+    echo "$s" >> $T
+done
+
+grep ^sd $T | sort > $T2
+grep ^hd $T | sort >> $T2
+grep -vE '^sd|^hd' $T | sort >> $T2
+
+for s in `cat $T2`; do
+    SS=`cat /sys/block/$s/size`
+    SIZE=$((`cat /sys/block/$s/size`*512/1000/1000/1000))
+	MODEL=
+	if [ -f /sys/block/$s/device/model ]; then
+		MODEL=" - `cat /sys/block/$s/device/model`"
+	fi
+    echo "$s \"${SIZE}Gb$MODEL\"" >> $T
+    
+    if [ "PREV_DEV" != "$s" -a "$SIZE" = "$PREV_S" -a "$MODEL" = "$PREV_M" ];then
+	echo "$PREV_DEV: \"${PREV_S}Gb$PREV_M\" \n" >> $T3
+	echo "$s: \"${SIZE}Gb$MODEL\" \n" >> $T3
+    fi
+    PREV_DEV=$s
+    PREV_S=$SIZE
+    PREV_M=$MODEL
+done
+
+num_devs=$(cat $T3 | wc -l)
+if [ $num_devs -ge 2 ];then
+    msgbox "Found two similar devices"
+    cat $T3 > /tmp/logger
+    propose_raid
+fi
+
+# Add new raid to $T
+
+
+

@@ -1,0 +1,7 @@
+#!/bin/sh -e
+
+subst "s|HWCLOCK_SET_AT_HALT=false|HWCLOCK_SET_AT_HALT=true|g" /etc/sysconfig/clock
+subst "s|HWCLOCK_ADJUST=false|HWCLOCK_ADJUST=true|g" /etc/sysconfig/clock
+subst "s|#ZONE=\"Europe\/Moscow\"|ZONE=\"$GLOBAL_TIMEZONE\"|g" /etc/sysconfig/clock
+
+cat /usr/share/zoneinfo/$GLOBAL_TIMEZONE > /etc/localtime
